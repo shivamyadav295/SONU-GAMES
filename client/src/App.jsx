@@ -76,8 +76,29 @@ export function App() {
   const [pvpMatchWinner, setPvpMatchWinner] = useState(null);
   const [pvpRematchWaiting, setPvpRematchWaiting] = useState(false);
   const [floatingReaction, setFloatingReaction] = useState(null);
+  const [forfeitMessage, setForfeitMessage] = useState(null);
 
   const pvcTimerRef = useRef(null);
+
+  // Handle browser tab/window exit - stops active games immediately
+  useEffect(() => {
+    const handleBrowserExit = () => {
+      if (room?.roomCode) {
+        const socket = getSocket();
+        socket.emit('leave_room', { roomCode: room.roomCode });
+      }
+      if (pvcTimerRef.current) {
+        clearInterval(pvcTimerRef.current);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBrowserExit);
+    window.addEventListener('pagehide', handleBrowserExit);
+    return () => {
+      window.removeEventListener('beforeunload', handleBrowserExit);
+      window.removeEventListener('pagehide', handleBrowserExit);
+    };
+  }, [room]);
 
   // ----------------------------------------------------
   // SINGLE-PLAYER (PvC) LOGIC
@@ -363,8 +384,17 @@ export function App() {
 
     socket.on('player_forfeited', ({ winner, message }) => {
       setPvpMatchWinner(winner);
+      setForfeitMessage(message || 'Opponent exited the browser. Match terminated!');
       setShowGameOver(true);
       soundManager.playWin();
+    });
+
+    socket.on('opponent_left', ({ message }) => {
+      setForfeitMessage(message || 'The other player closed their browser. Game stopped.');
+      setShowGameOver(true);
+      setRoom(null);
+      setIsInRoom(false);
+      setIsWaitingForOpponent(false);
     });
 
     socket.on('reaction_received', ({ emoji }) => {
@@ -681,9 +711,11 @@ export function App() {
         onPlayAgain={isPvc ? resetPvcMatch : handleRequestRematch}
         onExitLobby={() => {
           setShowGameOver(false);
+          setForfeitMessage(null);
           if (!isPvc) handleLeaveRoom();
         }}
         rematchWaiting={pvpRematchWaiting}
+        forfeitMessage={forfeitMessage}
       />
 
     </div>

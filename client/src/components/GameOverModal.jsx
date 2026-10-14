@@ -16,6 +16,7 @@ export const GameOverModal = ({
   onExitLobby,
   rematchWaiting = false,
   rematchStatus = null, // { p1Ready: Boolean, p2Ready: Boolean }
+  forfeitMessage = null, // alert message when player exits browser
 }) => {
   useEffect(() => {
     if (isOpen) {
@@ -86,11 +87,20 @@ export const GameOverModal = ({
             isMyWin ? 'text-amber-400 text-glow-cyan' : 'text-rose-400'
           }`}
         >
-          {isMyWin ? 'MATCH VICTORY!' : 'MATCH DEFEAT'}
+          {forfeitMessage ? 'MATCH TERMINATED' : isMyWin ? 'MATCH VICTORY!' : 'MATCH DEFEAT'}
         </h2>
 
-        <p className="text-xs sm:text-sm text-slate-300 mt-1 font-tech tracking-wider">
-          {isMyWin
+        {forfeitMessage && (
+          <div className="mt-3 p-3 rounded-xl bg-amber-950/60 border border-amber-500/60 text-amber-300 text-xs font-semibold flex items-center justify-center space-x-2">
+            <span>🚨</span>
+            <span>{forfeitMessage}</span>
+          </div>
+        )}
+
+        <p className="text-xs sm:text-sm text-slate-300 mt-2 font-tech tracking-wider">
+          {forfeitMessage
+            ? 'The game was stopped because the player disconnected or exited the browser window.'
+            : isMyWin
             ? `Congratulations! You conquered ${player2?.username || 'the opponent'}.`
             : `${winner?.username || 'Opponent'} claimed the championship series.`}
         </p>

@@ -215,6 +215,7 @@ function handlePlayerExit(io, roomCode, socketId) {
   const room = rooms.get(roomCode);
   if (!room) return;
 
+  // Immediately stop any active round countdown timer
   if (room.roundTimer) {
     clearInterval(room.roundTimer);
     room.roundTimer = null;
@@ -224,15 +225,16 @@ function handlePlayerExit(io, roomCode, socketId) {
   const isP2 = room.player2 && room.player2.socketId === socketId;
 
   if (room.status === 'playing' || room.status === 'round_result') {
-    // Forfeit win for remaining player
+    // Forfeit win for remaining player because opponent closed browser or left
     const remainingWinner = isP1 ? room.player2 : room.player1;
     const forfeiter = isP1 ? room.player1 : room.player2;
 
     room.status = 'game_over';
     io.to(roomCode).emit('player_forfeited', {
-      winner: remainingWinner ? { id: remainingWinner.id, username: remainingWinner.username } : null,
+      winner: remainingWinner ? { id: remainingWinner.id, username: remainingWinner.username, avatar: remainingWinner.avatar } : null,
       forfeiter: forfeiter ? { id: forfeiter.id, username: forfeiter.username } : null,
-      message: `${forfeiter ? forfeiter.username : 'Opponent'} disconnected. Victory by forfeit!`,
+      message: `${forfeiter ? forfeiter.username : 'Opponent'} closed their browser. Game stopped!`,
+      reason: 'browser_exit',
     });
 
     // Record forfeit match
@@ -248,12 +250,15 @@ function handlePlayerExit(io, roomCode, socketId) {
       }).catch((e) => console.error('Error saving forfeit match:', e));
     }
   } else {
+    // Waiting lobby state: notify remaining host/guest
     io.to(roomCode).emit('opponent_left', {
-      message: 'Opponent left the room.',
+      message: 'The other player closed their browser. Game stopped.',
     });
   }
 
+  // Delete room completely from memory
   rooms.delete(roomCode);
+  console.log(`[Socket] Room ${roomCode} closed and removed due to player disconnect/browser exit.`);
 }
 
 function startRoundCountdown(io, room) {
