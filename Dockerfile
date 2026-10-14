@@ -3,18 +3,20 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install client dependencies & build frontend
+# 1. Install client dependencies & build frontend
 COPY client/package*.json ./client/
 RUN cd client && npm install
 
 COPY client/ ./client/
 RUN cd client && npm run build
 
-# Install server dependencies
+# 2. Install server dependencies & copy all server code
 COPY server/package*.json ./server/
 RUN cd server && npm install --omit=dev
 
-# Production runner image
+COPY server/ ./server/
+
+# 3. Production runner image
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
