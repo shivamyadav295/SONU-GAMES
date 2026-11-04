@@ -34,7 +34,7 @@ export const ScoreBoard = ({
       <div className="grid grid-cols-2 gap-4 py-4 items-center">
         
         {/* P1 Score & Goal Dots */}
-        <div className="flex flex-col items-center sm:items-start pl-2">
+        <div className={`flex flex-col items-center ${mode === 'pvc' ? 'sm:items-end order-2' : 'sm:items-start order-1'} pl-2`}>
           <div className="flex items-center space-x-2">
             <span className="text-2xl font-arcade font-bold text-cyan-400">
               {p1Score}
@@ -60,7 +60,7 @@ export const ScoreBoard = ({
         </div>
 
         {/* P2 Score & Goal Dots */}
-        <div className="flex flex-col items-center sm:items-end pr-2">
+        <div className={`flex flex-col items-center ${mode === 'pvc' ? 'sm:items-start order-1' : 'sm:items-end order-2'} pr-2`}>
           <div className="flex items-center space-x-2">
             <span className="text-xs text-slate-400 font-tech uppercase tracking-wider">
               {player2?.username || 'Opponent'}

@@ -75,7 +75,7 @@ class InMemoryStore {
     return 'mem_' + (++this.nextId) + '_' + Date.now().toString(36);
   }
 
-  async createUser({ username, email, password, isGuest = false, avatar = 'robot' }) {
+  async createUser({ username, email, phone, password, recoveryCodeHash, isGuest = false, avatar = 'robot', privacy = { maskContact: true } }) {
     // Check uniqueness
     for (const u of this.users.values()) {
       if (u.username.toLowerCase() === username.toLowerCase()) {
@@ -83,6 +83,9 @@ class InMemoryStore {
       }
       if (email && u.email && u.email.toLowerCase() === email.toLowerCase()) {
         throw new Error('Email is already registered');
+      }
+      if (phone && u.phone && u.phone === phone) {
+        throw new Error('Mobile number is already registered');
       }
     }
 
@@ -92,9 +95,14 @@ class InMemoryStore {
       id,
       username,
       email: email || null,
+      phone: phone || null,
       password: password || null,
+      recoveryCodeHash,
       isGuest,
       avatar,
+      privacy: {
+        maskContact: privacy?.maskContact ?? true,
+      },
       stats: {
         wins: 0,
         losses: 0,
@@ -114,24 +122,109 @@ class InMemoryStore {
 
   async findUserByEmail(email) {
     if (!email) return null;
-    const lower = email.toLowerCase();
+    const lower = email.toLowerCase().trim();
     for (const u of this.users.values()) {
-      if (u.email && u.email.toLowerCase() === lower) return u;
+      if (u.email && u.email.toLowerCase().trim() === lower) return u;
+    }
+    return null;
+  }
+
+  async findUserByPhone(phone) {
+    if (!phone) return null;
+    const cleaned = phone.replace(/[\s-]/g, '');
+    for (const u of this.users.values()) {
+      if (u.phone && u.phone.replace(/[\s-]/g, '') === cleaned) return u;
     }
     return null;
   }
 
   async findUserByUsername(username) {
     if (!username) return null;
-    const lower = username.toLowerCase();
+    const lower = username.toLowerCase().trim();
     for (const u of this.users.values()) {
-      if (u.username && u.username.toLowerCase() === lower) return u;
+      if (u.username && u.username.toLowerCase().trim() === lower) return u;
     }
     return null;
   }
 
+  async findUserByLoginIdentifier(identifier) {
+    if (!identifier) return null;
+    const cleanId = identifier.trim();
+
+    // Try email
+    if (cleanId.includes('@')) {
+      const byEmail = await this.findUserByEmail(cleanId);
+      if (byEmail) return byEmail;
+    }
+
+    // Try phone
+    const byPhone = await this.findUserByPhone(cleanId);
+    if (byPhone) return byPhone;
+
+    // Try username
+    const byUser = await this.findUserByUsername(cleanId);
+    if (byUser) return byUser;
+
+    // Direct email fallback if identifier was entered without @
+    return this.findUserByEmail(cleanId);
+  }
+
   async findUserById(id) {
     return this.users.get(id) || null;
+  }
+
+  async updateUserProfile(userId, { username, email, phone, avatar, password, privacy }) {
+    const user = this.users.get(userId);
+    if (!user) throw new Error('User not found');
+
+    // Check uniqueness conflicts with other users
+    for (const u of this.users.values()) {
+      if ((u._id || u.id) !== userId) {
+        if (username && u.username && u.username.toLowerCase() === username.toLowerCase()) {
+          throw new Error('Username is already taken');
+        }
+        if (email && u.email && u.email.toLowerCase() === email.toLowerCase()) {
+          throw new Error('Email is already in use by another account');
+        }
+        if (phone && u.phone && u.phone.replace(/[\s-]/g, '') === phone.replace(/[\s-]/g, '')) {
+          throw new Error('Mobile number is already in use by another account');
+        }
+      }
+    }
+
+    if (username) user.username = username.trim();
+    if (email !== undefined) user.email = email ? email.toLowerCase().trim() : null;
+    if (phone !== undefined) user.phone = phone ? phone.trim() : null;
+    if (avatar) user.avatar = avatar;
+    if (password) user.password = password;
+    if (privacy) {
+      user.privacy = { ...(user.privacy || {}), ...privacy };
+    }
+    user.isGuest = false; // upgrading or updating makes it permanent
+    user.updatedAt = new Date();
+
+    return user;
+  }
+
+  async createRecoveryCode(userId, recoveryCodeHash) {
+    const user = this.users.get(userId);
+    if (!user) throw new Error('User not found');
+    user.recoveryCodeHash = recoveryCodeHash;
+    user.updatedAt = new Date();
+    return user;
+  }
+
+  async resetPasswordWithRecoveryCode(currentHash, passwordHash, nextHash) {
+    for (const user of this.users.values()) {
+      if (user.recoveryCodeHash === currentHash) {
+        user.password = passwordHash;
+        user.recoveryCodeHash = nextHash;
+        user.isGuest = false;
+        user.updatedAt = new Date();
+        return user;
+      }
+    }
+    return null;
   }
 
   async updateUserStats(userId, result) {
@@ -228,16 +321,42 @@ const storage = {
 
   async findUserByEmail(email) {
     if (isMongoAvailable()) {
-      return User.findOne({ email: email.toLowerCase() });
+      return User.findOne({ email: email.toLowerCase().trim() });
     }
     return memoryStore.findUserByEmail(email);
   },
 
+  async findUserByPhone(phone) {
+    if (isMongoAvailable()) {
+      const cleaned = phone.replace(/[\s-]/g, '');
+      return User.findOne({ phone: cleaned });
+    }
+    return memoryStore.findUserByPhone(phone);
+  },
+
   async findUserByUsername(username) {
     if (isMongoAvailable()) {
-      return User.findOne({ username });
+      return User.findOne({ username: new RegExp(`^${username.trim()}$`, 'i') });
     }
     return memoryStore.findUserByUsername(username);
+  },
+
+  async findUserByLoginIdentifier(identifier) {
+    if (!identifier) return null;
+    const cleanId = identifier.trim();
+
+    if (cleanId.includes('@')) {
+      const byEmail = await this.findUserByEmail(cleanId);
+      if (byEmail) return byEmail;
+    }
+
+    const byPhone = await this.findUserByPhone(cleanId);
+    if (byPhone) return byPhone;
+
+    const byUser = await this.findUserByUsername(cleanId);
+    if (byUser) return byUser;
+
+    return this.findUserByEmail(cleanId);
   },
 
   async findUserById(id) {
@@ -245,6 +364,73 @@ const storage = {
       return User.findById(id);
     }
     return memoryStore.findUserById(id);
+  },
+
+  async createRecoveryCode(userId, recoveryCodeHash) {
+    if (isMongoAvailable()) {
+      const user = await User.findById(userId);
+      if (!user) return null;
+      user.recoveryCodeHash = recoveryCodeHash;
+      await user.save();
+      return user.toObject();
+    }
+    return memoryStore.createRecoveryCode(userId, recoveryCodeHash);
+  },
+
+  async resetPasswordWithRecoveryCode(currentHash, passwordHash, nextHash) {
+    if (isMongoAvailable()) {
+      return User.findOneAndUpdate(
+        { recoveryCodeHash: currentHash },
+        {
+          $set: { password: passwordHash, recoveryCodeHash: nextHash, isGuest: false },
+        },
+        { new: true }
+      ).select('+recoveryCodeHash').lean();
+    }
+    return memoryStore.resetPasswordWithRecoveryCode(currentHash, passwordHash, nextHash);
+  },
+
+  async updateUserProfile(userId, updateData) {
+    if (isMongoAvailable()) {
+      const user = await User.findById(userId);
+      if (!user) throw new Error('User not found');
+
+      const { username, email, phone, avatar, password, privacy } = updateData;
+
+      if (username && username.toLowerCase() !== user.username.toLowerCase()) {
+        const exist = await User.findOne({ username: new RegExp(`^${username.trim()}$`, 'i'), _id: { $ne: userId } });
+        if (exist) throw new Error('Username is already taken');
+        user.username = username.trim();
+      }
+
+      if (email !== undefined) {
+        if (email && email.toLowerCase() !== (user.email || '')) {
+          const exist = await User.findOne({ email: email.toLowerCase().trim(), _id: { $ne: userId } });
+          if (exist) throw new Error('Email is already in use by another account');
+        }
+        user.email = email ? email.toLowerCase().trim() : undefined;
+      }
+
+      if (phone !== undefined) {
+        const cleanPhone = phone ? phone.replace(/[\s-]/g, '') : null;
+        if (cleanPhone && cleanPhone !== (user.phone || '')) {
+          const exist = await User.findOne({ phone: cleanPhone, _id: { $ne: userId } });
+          if (exist) throw new Error('Mobile number is already in use by another account');
+        }
+        user.phone = cleanPhone || undefined;
+      }
+
+      if (avatar) user.avatar = avatar;
+      if (password) user.password = password;
+      if (privacy) {
+        user.privacy = { ...(user.privacy || {}), ...privacy };
+      }
+      user.isGuest = false;
+
+      await user.save();
+      return user.toObject();
+    }
+    return memoryStore.updateUserProfile(userId, updateData);
   },
 
   async updateUserStats(userId, result) {

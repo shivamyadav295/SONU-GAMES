@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trophy, History, Volume2, VolumeX, User, LogIn, LogOut, Flame, Shield, Sparkles } from 'lucide-react';
+import { Trophy, History, Volume2, VolumeX, LogIn, LogOut, Flame } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import soundManager from '../services/sound';
 
@@ -24,27 +24,24 @@ export const Navbar = ({ onOpenLeaderboard, onOpenHistory, onOpenAuth }) => {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-[#1f2b48] bg-[#090d16]/90 backdrop-blur-md">
+    <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/90 backdrop-blur-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         
         {/* Brand Logo */}
         <div className="flex items-center space-x-3 cursor-pointer group">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 via-indigo-600 to-pink-500 p-[2px] shadow-lg shadow-cyan-500/20 group-hover:shadow-cyan-500/40 transition-all duration-300">
-            <div className="w-full h-full bg-[#0d1322] rounded-[10px] flex items-center justify-center">
-              <span className="text-xl">⚔️</span>
+          <div className="w-10 h-10 rounded-xl bg-emerald-100 border border-emerald-200 transition-colors group-hover:bg-emerald-50">
+            <div className="w-full h-full rounded-[10px] flex items-center justify-center">
+              <span className="text-xl" aria-hidden="true">✊</span>
             </div>
           </div>
           <div>
             <div className="flex items-center space-x-1.5">
-              <span className="font-arcade text-lg sm:text-xl font-bold tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-sky-300 to-pink-400">
+              <span className="font-arcade text-lg sm:text-xl font-bold tracking-tight text-slate-800">
                 CLASH RPS
               </span>
-              <span className="text-[10px] font-arcade px-1.5 py-0.5 rounded bg-cyan-950/80 text-cyan-400 border border-cyan-800/50">
-                PRO
-              </span>
             </div>
-            <p className="text-[10px] text-slate-400 tracking-wider font-tech hidden sm:block">
-              CYBERPUNK ROCK PAPER SCISSORS
+            <p className="text-[10px] text-slate-500 tracking-wide hidden sm:block">
+              ROCK · PAPER · SCISSORS
             </p>
           </div>
         </div>
@@ -58,8 +55,8 @@ export const Navbar = ({ onOpenLeaderboard, onOpenHistory, onOpenAuth }) => {
             title={muted ? 'Unmute Audio' : 'Mute Audio'}
             className={`p-2 rounded-lg border transition-all ${
               muted
-                ? 'bg-red-950/40 border-red-800/50 text-red-400 hover:bg-red-900/50'
-                : 'bg-cyan-950/40 border-cyan-800/50 text-cyan-400 hover:bg-cyan-900/50 shadow-sm shadow-cyan-500/20'
+                ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100'
+                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
             }`}
           >
             {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
@@ -71,7 +68,7 @@ export const Navbar = ({ onOpenLeaderboard, onOpenHistory, onOpenAuth }) => {
               soundManager.playSelect();
               onOpenLeaderboard();
             }}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-[#233052] bg-[#111726]/80 hover:bg-[#161f36] hover:border-amber-500/50 text-amber-400 text-xs sm:text-sm font-medium transition-all duration-200"
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-amber-50 hover:border-amber-200 text-amber-700 text-xs sm:text-sm font-medium transition-all duration-200"
           >
             <Trophy className="w-4 h-4" />
             <span className="hidden sm:inline">Leaderboard</span>
@@ -83,7 +80,7 @@ export const Navbar = ({ onOpenLeaderboard, onOpenHistory, onOpenAuth }) => {
               soundManager.playSelect();
               onOpenHistory();
             }}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-[#233052] bg-[#111726]/80 hover:bg-[#161f36] hover:border-cyan-500/50 text-slate-300 hover:text-cyan-400 text-xs sm:text-sm font-medium transition-all duration-200"
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-emerald-50 hover:border-emerald-200 text-slate-600 hover:text-emerald-800 text-xs sm:text-sm font-medium transition-all duration-200"
           >
             <History className="w-4 h-4" />
             <span className="hidden sm:inline">History</span>
@@ -91,11 +88,11 @@ export const Navbar = ({ onOpenLeaderboard, onOpenHistory, onOpenAuth }) => {
 
           {/* User Profile Badge & Auth Actions */}
           {user ? (
-            <div className="flex items-center space-x-2 pl-1 sm:pl-2 border-l border-[#1f2b48]">
+            <div className="flex items-center space-x-2 pl-1 sm:pl-2 border-l border-slate-200">
               {/* Profile Chip */}
               <div
                 onClick={onOpenAuth}
-                className="flex items-center space-x-2 px-2.5 py-1.5 rounded-lg bg-[#141b2e] border border-[#233052] hover:border-cyan-500/40 cursor-pointer transition-all"
+                className="flex items-center space-x-2 px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-emerald-300 cursor-pointer transition-all"
                 title={`Profile: ${user.username} (${user.isGuest ? 'Guest Mode' : 'Registered User'})`}
               >
                 <span className="text-base sm:text-lg">
@@ -103,11 +100,11 @@ export const Navbar = ({ onOpenLeaderboard, onOpenHistory, onOpenAuth }) => {
                 </span>
                 <div className="text-left hidden md:block">
                   <div className="flex items-center space-x-1">
-                    <span className="text-xs font-semibold text-slate-200 truncate max-w-[100px]">
+                    <span className="text-xs font-semibold text-slate-800 truncate max-w-[100px]">
                       {user.username}
                     </span>
                     {user.isGuest && (
-                      <span className="text-[9px] px-1 py-0.2 rounded bg-amber-950 text-amber-400 border border-amber-800">
+                      <span className="text-[9px] px-1 py-0.2 rounded bg-amber-50 text-amber-800 border border-amber-200">
                         Guest
                       </span>
                     )}
@@ -133,7 +130,7 @@ export const Navbar = ({ onOpenLeaderboard, onOpenHistory, onOpenAuth }) => {
                     soundManager.playSelect();
                     onOpenAuth();
                   }}
-                  className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-semibold text-xs transition-all shadow-md shadow-cyan-500/20"
+                  className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs whitespace-nowrap transition-colors"
                 >
                   <span className="flex items-center space-x-1">
                     <LogIn className="w-3.5 h-3.5" />
@@ -147,7 +144,7 @@ export const Navbar = ({ onOpenLeaderboard, onOpenHistory, onOpenAuth }) => {
                     logout();
                   }}
                   title="Log Out"
-                  className="p-1.5 rounded-lg border border-[#233052] bg-[#111726] hover:bg-rose-950/40 hover:border-rose-800/50 text-slate-400 hover:text-rose-400 transition-all"
+                  className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-200 text-slate-500 hover:text-rose-700 transition-all"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
@@ -156,7 +153,7 @@ export const Navbar = ({ onOpenLeaderboard, onOpenHistory, onOpenAuth }) => {
           ) : (
             <button
               onClick={onOpenAuth}
-              className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-semibold transition-all"
+              className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs whitespace-nowrap font-semibold transition-colors"
             >
               <LogIn className="w-4 h-4" />
               <span>Login</span>

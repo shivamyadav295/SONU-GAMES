@@ -1,5 +1,6 @@
 import React from 'react';
-import { Swords, Zap, CheckCircle2, Clock } from 'lucide-react';
+import { Swords, Zap, CheckCircle2, Clock, Play, Square, Pause, RotateCcw } from 'lucide-react';
+import MoveIllustration from './MoveIllustration';
 
 export const ClashArena = ({
   player1,
@@ -13,14 +14,13 @@ export const ClashArena = ({
   timeLeft,
   maxTime = 5,
   roundNumber = 1,
+  gameState = 'playing', // 'idle', 'playing', 'paused'
+  onStartGame,
+  onStopGame,
+  onResumeGame,
+  onResetGame,
+  mode = 'pvc',
 }) => {
-  const moveIcons = {
-    rock: '✊',
-    paper: '✋',
-    scissors: '✌️',
-    timeout: '⌛',
-  };
-
   const moveLabels = {
     rock: 'ROCK',
     paper: 'PAPER',
@@ -59,48 +59,96 @@ export const ClashArena = ({
   // Timer circle calculation
   const progressPercent = Math.max(0, Math.min(100, (timeLeft / maxTime) * 100));
   const strokeDashoffset = 100 - progressPercent;
+  const player1Order = mode === 'pvc' ? 'order-3' : 'order-1';
+  const player2Order = mode === 'pvc' ? 'order-1' : 'order-3';
 
   return (
-    <div className="relative w-full rounded-3xl bg-[#0b0f1a] border border-[#1f2b48] p-6 sm:p-8 overflow-hidden shadow-2xl">
-      
-      {/* Background Arena FX */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-950/20 via-transparent to-transparent pointer-events-none" />
-      <div className="absolute -top-24 left-1/4 w-72 h-72 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-24 right-1/4 w-72 h-72 bg-pink-500/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="arena-glass-panel relative w-full rounded-3xl p-5 sm:p-8 overflow-hidden">
 
       {/* Top Arena Info Bar */}
-      <div className="relative flex items-center justify-between pb-4 mb-6 border-b border-[#1b253d]">
+      <div className="relative flex flex-wrap items-center justify-between gap-2 pb-4 mb-6 border-b border-[#1b253d]">
         <div className="flex items-center space-x-2">
-          <span className="text-xs font-arcade font-bold tracking-widest text-cyan-400 uppercase">
+          <span className="text-xs font-arcade font-bold tracking-wide text-slate-700 uppercase">
             ROUND {roundNumber}
           </span>
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#162035] text-slate-300 border border-[#233052]">
-            LIVE COMBAT
+          <span
+            className={`text-[10px] px-2.5 py-0.5 rounded-full font-semibold border ${
+              gameState === 'playing'
+                ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
+                : gameState === 'paused'
+                ? 'bg-rose-950/80 text-rose-300 border-rose-800'
+                : 'bg-amber-950/80 text-amber-300 border-amber-800'
+            }`}
+          >
+            {gameState === 'playing' ? 'LIVE COMBAT' : gameState === 'paused' ? 'GAME STOPPED' : 'READY TO START'}
           </span>
         </div>
 
-        {/* Center Countdown Timer */}
-        <div className="flex items-center space-x-2">
-          <Clock className="w-3.5 h-3.5 text-slate-400" />
-          <span
-            className={`font-arcade text-sm font-bold tracking-wider ${
-              timeLeft <= 2 ? 'text-rose-400 animate-ping' : timeLeft <= 4 ? 'text-amber-400' : 'text-slate-300'
-            }`}
-          >
-            {timeLeft}s
-          </span>
+        {/* Center / Right Controls in Top Bar */}
+        <div className="flex items-center space-x-2.5">
+          {/* Active Timer Display */}
+          <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200">
+            <Clock className="w-3.5 h-3.5 text-slate-400" />
+            <span
+              className={`font-arcade text-xs sm:text-sm font-bold tracking-wider ${
+                gameState !== 'playing'
+                  ? 'text-slate-400'
+                  : timeLeft <= 2
+                  ? 'text-rose-400 animate-ping'
+                  : timeLeft <= 4
+                  ? 'text-amber-400'
+                  : 'text-slate-200'
+              }`}
+            >
+              {timeLeft}s
+            </span>
+          </div>
+
+          {/* Quick Start / Stop button inside the Arena Header */}
+          {mode === 'pvc' && (
+            <>
+              {gameState === 'idle' && onStartGame && (
+                <button
+                  onClick={onStartGame}
+                  className="px-3 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-arcade font-bold text-xs tracking-wider flex items-center space-x-1 shadow-md shadow-emerald-500/20 transition-all active:scale-95"
+                >
+                  <Play className="w-3 h-3 fill-black" />
+                  <span>START</span>
+                </button>
+              )}
+
+              {gameState === 'playing' && onStopGame && (
+                <button
+                  onClick={onStopGame}
+                  className="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-arcade font-bold text-xs tracking-wider flex items-center space-x-1 shadow-md shadow-rose-600/30 transition-all active:scale-95"
+                >
+                  <Square className="w-3 h-3 fill-white" />
+                  <span>STOP</span>
+                </button>
+              )}
+
+              {gameState === 'paused' && onResumeGame && (
+                <button
+                  onClick={onResumeGame}
+                  className="px-3 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black font-arcade font-bold text-xs tracking-wider flex items-center space-x-1 shadow-md shadow-cyan-500/20 transition-all active:scale-95"
+                >
+                  <Play className="w-3 h-3 fill-black" />
+                  <span>RESUME</span>
+                </button>
+              )}
+            </>
+          )}
         </div>
       </div>
 
-      {/* Main Duel Stage: P1 Hand vs Center VS vs P2 Hand */}
+      {/* Keep PvP players in score order; show the bot opposite the guest in PvC. */}
       <div className="relative grid grid-cols-3 items-center min-h-[220px] sm:min-h-[260px]">
         
-        {/* Left Side: Player 1 */}
-        <div className="flex flex-col items-center text-center">
+        <div className={`flex flex-col items-center text-center ${player1Order}`}>
           {/* Avatar & Player Info */}
-          <div className="flex items-center space-x-2 mb-3">
+          <div className={`flex items-center space-x-2 mb-3 ${mode === 'pvc' ? 'flex-row-reverse' : ''}`}>
             <span className="text-2xl">{avatarIcons[player1?.avatar] || '🤖'}</span>
-            <div className="text-left">
+            <div className={mode === 'pvc' ? 'text-right' : 'text-left'}>
               <span className="text-xs sm:text-sm font-bold text-cyan-400 block truncate max-w-[110px] sm:max-w-[150px]">
                 {player1?.username || 'You'}
               </span>
@@ -112,9 +160,9 @@ export const ClashArena = ({
 
           {/* Hand Box */}
           <div
-            className={`relative w-24 h-24 sm:w-32 sm:h-32 rounded-2xl flex flex-col items-center justify-center border transition-all duration-300 ${
+            className={`relative w-24 h-24 sm:w-32 sm:h-32 rounded-2xl flex flex-col items-center justify-center border transition-all duration-500 ease-out ${
               isClashing
-                ? 'animate-clash-left bg-cyan-950/40 border-cyan-400 shadow-xl shadow-cyan-500/30'
+                ? `${mode === 'pvc' ? 'animate-clash-right' : 'animate-clash-left'} bg-cyan-950/40 border-cyan-400 shadow-xl shadow-cyan-500/30`
                 : roundResult === 'p1'
                 ? 'border-emerald-400 bg-emerald-950/40 shadow-xl shadow-emerald-500/25 ring-2 ring-emerald-400'
                 : roundResult === 'p2'
@@ -125,17 +173,29 @@ export const ClashArena = ({
             }`}
           >
             {p1Move ? (
-              <span className="text-5xl sm:text-6xl drop-shadow-[0_0_15px_rgba(0,240,255,0.4)]">
-                {moveIcons[p1Move] || '❓'}
-              </span>
+              p1Move === 'timeout' ? (
+                <span className="move-icon-3d move-icon-3d--arena" aria-hidden="true">⌛</span>
+              ) : (
+                <MoveIllustration move={p1Move} className="move-icon-3d move-icon-3d--arena" />
+              )
             ) : p1Locked ? (
               <div className="flex flex-col items-center">
-                <span className="text-4xl animate-pulse">🤜</span>
+                <span className="text-4xl animate-gentle-pulse">🤜</span>
                 <span className="text-[10px] font-arcade font-bold text-cyan-400 mt-1">LOCKED</span>
+              </div>
+            ) : gameState === 'idle' ? (
+              <div className="flex flex-col items-center text-slate-500">
+                <span className="text-2xl">⏳</span>
+                <span className="text-[10px] font-tech text-slate-400 mt-1">WAITING START</span>
+              </div>
+            ) : gameState === 'paused' ? (
+              <div className="flex flex-col items-center text-slate-500">
+                <span className="text-2xl">⏸️</span>
+                <span className="text-[10px] font-tech text-slate-400 mt-1">STOPPED</span>
               </div>
             ) : (
               <div className="flex flex-col items-center text-slate-500">
-                <span className="text-3xl animate-bounce-short">❓</span>
+                <span className="text-3xl">❓</span>
                 <span className="text-[10px] font-tech text-slate-400 mt-1">CHOOSE MOVE</span>
               </div>
             )}
@@ -154,14 +214,51 @@ export const ClashArena = ({
                 <CheckCircle2 className="w-3 h-3 mr-1" /> Move Locked
               </span>
             ) : (
-              <span className="text-[11px] text-slate-500 font-tech">Thinking...</span>
+              <span className="text-[11px] text-slate-500 font-tech">
+                {gameState === 'idle' ? 'Ready to Start' : gameState === 'paused' ? 'Combat Halted' : 'Thinking...'}
+              </span>
             )}
           </div>
         </div>
 
-        {/* Center Stage: VS / Clash / Result Banner */}
-        <div className="flex flex-col items-center justify-center">
-          {roundResult ? (
+        {/* Center Stage: VS / Clash / Result Banner / Start-Stop states */}
+        <div className="order-2 flex flex-col items-center justify-center">
+          {gameState === 'idle' ? (
+            <div className="flex flex-col items-center text-center animate-scaleIn">
+              <button
+                onClick={onStartGame}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 hover:from-emerald-400 hover:to-cyan-300 text-black font-arcade font-bold text-xs sm:text-sm tracking-wider shadow-xl shadow-emerald-500/30 flex items-center space-x-2 transition-all transform hover:scale-105 active:scale-95"
+              >
+                <Play className="w-4 h-4 fill-black" />
+                <span>START GAME</span>
+              </button>
+              <p className="text-[10px] text-slate-400 font-tech mt-2">
+                Click Start to begin Round {roundNumber}
+              </p>
+            </div>
+          ) : gameState === 'paused' ? (
+            <div className="flex flex-col items-center text-center animate-scaleIn">
+              <div className="px-3 py-1 rounded-full bg-rose-950/80 border border-rose-600 text-rose-300 font-arcade text-xs tracking-wider mb-2.5 shadow-lg shadow-rose-950/50">
+                GAME STOPPED
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={onResumeGame}
+                  className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-arcade font-bold text-xs tracking-wider flex items-center space-x-1 shadow-md shadow-emerald-500/20"
+                >
+                  <Play className="w-3 h-3 fill-black" />
+                  <span>RESUME</span>
+                </button>
+                <button
+                  onClick={onResetGame}
+                  className="px-3 py-1.5 rounded-xl bg-[#18233a] hover:bg-[#233052] border border-[#2b3a60] text-slate-200 font-arcade text-xs tracking-wider flex items-center space-x-1"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>RESET</span>
+                </button>
+              </div>
+            </div>
+          ) : roundResult ? (
             <div className="flex flex-col items-center text-center animate-scaleIn">
               <div
                 className={`px-3 sm:px-4 py-1.5 rounded-full font-arcade font-bold text-xs sm:text-sm tracking-wider uppercase border shadow-lg ${
@@ -179,7 +276,7 @@ export const ClashArena = ({
               </p>
             </div>
           ) : isClashing ? (
-            <div className="flex flex-col items-center animate-pulse">
+            <div className="flex flex-col items-center animate-gentle-pulse">
               <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-cyan-400 to-pink-500 flex items-center justify-center shadow-lg shadow-pink-500/40">
                 <Zap className="w-6 h-6 text-black fill-black" />
               </div>
@@ -225,11 +322,11 @@ export const ClashArena = ({
           )}
         </div>
 
-        {/* Right Side: Opponent (Bot or Player 2) */}
-        <div className="flex flex-col items-center text-center">
+        <div className={`flex flex-col items-center text-center ${player2Order}`}>
           {/* Avatar & Player Info */}
           <div className="flex items-center space-x-2 mb-3">
-            <div className="text-right">
+            <span className="text-2xl">{avatarIcons[player2?.avatar] || (player2?.isBot ? '🤖' : '🥷')}</span>
+            <div className={mode === 'pvc' ? 'text-left' : 'text-right'}>
               <span className="text-xs sm:text-sm font-bold text-pink-400 block truncate max-w-[110px] sm:max-w-[150px]">
                 {player2?.username || 'Opponent'}
               </span>
@@ -237,14 +334,13 @@ export const ClashArena = ({
                 Score: <strong className="text-white text-xs">{player2?.score || 0}</strong>
               </span>
             </div>
-            <span className="text-2xl">{avatarIcons[player2?.avatar] || (player2?.isBot ? '🤖' : '🥷')}</span>
           </div>
 
           {/* Hand Box */}
           <div
-            className={`relative w-24 h-24 sm:w-32 sm:h-32 rounded-2xl flex flex-col items-center justify-center border transition-all duration-300 ${
+            className={`relative w-24 h-24 sm:w-32 sm:h-32 rounded-2xl flex flex-col items-center justify-center border transition-all duration-500 ease-out ${
               isClashing
-                ? 'animate-clash-right bg-pink-950/40 border-pink-400 shadow-xl shadow-pink-500/30'
+                ? `${mode === 'pvc' ? 'animate-clash-left' : 'animate-clash-right'} bg-pink-950/40 border-pink-400 shadow-xl shadow-pink-500/30`
                 : roundResult === 'p2'
                 ? 'border-emerald-400 bg-emerald-950/40 shadow-xl shadow-emerald-500/25 ring-2 ring-emerald-400'
                 : roundResult === 'p1'
@@ -255,18 +351,22 @@ export const ClashArena = ({
             }`}
           >
             {p2Move ? (
-              <span className="text-5xl sm:text-6xl drop-shadow-[0_0_15px_rgba(255,0,127,0.4)]">
-                {moveIcons[p2Move] || '❓'}
-              </span>
+              p2Move === 'timeout' ? (
+                <span className="move-icon-3d move-icon-3d--arena" aria-hidden="true">⌛</span>
+              ) : (
+                <MoveIllustration move={p2Move} className="move-icon-3d move-icon-3d--arena" />
+              )
             ) : p2Locked ? (
               <div className="flex flex-col items-center">
-                <span className="text-4xl animate-pulse">🤛</span>
+                <span className="text-4xl animate-gentle-pulse">🤛</span>
                 <span className="text-[10px] font-arcade font-bold text-pink-400 mt-1">LOCKED</span>
               </div>
             ) : (
               <div className="flex flex-col items-center text-slate-500">
-                <span className="text-3xl animate-bounce-short">❓</span>
-                <span className="text-[10px] font-tech text-slate-400 mt-1">DECIDING</span>
+                <span className="text-3xl">❓</span>
+                <span className="text-[10px] font-tech text-slate-400 mt-1">
+                  {gameState === 'idle' ? 'STANDBY' : gameState === 'paused' ? 'STOPPED' : 'DECIDING'}
+                </span>
               </div>
             )}
 
@@ -284,7 +384,9 @@ export const ClashArena = ({
                 <CheckCircle2 className="w-3 h-3 mr-1" /> Move Locked
               </span>
             ) : (
-              <span className="text-[11px] text-slate-500 font-tech">Thinking...</span>
+              <span className="text-[11px] text-slate-500 font-tech">
+                {gameState === 'idle' ? 'Standby' : gameState === 'paused' ? 'Halted' : 'Thinking...'}
+              </span>
             )}
           </div>
         </div>

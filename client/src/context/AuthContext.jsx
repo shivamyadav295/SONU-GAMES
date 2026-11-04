@@ -67,14 +67,46 @@ export const AuthProvider = ({ children }) => {
     return loggedInUser;
   };
 
-  const register = async (username, email, password, avatar) => {
-    const res = await authApi.register({ username, email, password, avatar });
+  const register = async (regData, email, password, avatar) => {
+    // Support both register({ username, email, phone, password, avatar }) or register(username, email, password, avatar)
+    const payload = typeof regData === 'object'
+      ? regData
+      : { username: regData, email, password, avatar };
+
+    const res = await authApi.register(payload);
     const { user: registeredUser, token: authToken } = res.data;
     setUser(registeredUser);
     setToken(authToken);
     localStorage.setItem('rps_auth_token', authToken);
     localStorage.setItem('rps_user_profile', JSON.stringify(registeredUser));
-    return registeredUser;
+    return { user: registeredUser, recoveryCode: res.data.recoveryCode };
+  };
+
+  const recoverAccount = async (recoveryData) => {
+    const res = await authApi.recoverAccount(recoveryData);
+    const { user: recoveredUser, token: authToken } = res.data;
+    setUser(recoveredUser);
+    setToken(authToken);
+    localStorage.setItem('rps_auth_token', authToken);
+    localStorage.setItem('rps_user_profile', JSON.stringify(recoveredUser));
+    return { user: recoveredUser, recoveryCode: res.data.recoveryCode };
+  };
+
+  const createRecoveryCode = async () => {
+    const res = await authApi.createRecoveryCode();
+    return res.data.recoveryCode;
+  };
+
+  const updateProfile = async (profileData) => {
+    const res = await authApi.updateProfile(profileData);
+    const { user: updatedUser, token: updatedToken } = res.data;
+    setUser(updatedUser);
+    if (updatedToken) {
+      setToken(updatedToken);
+      localStorage.setItem('rps_auth_token', updatedToken);
+    }
+    localStorage.setItem('rps_user_profile', JSON.stringify(updatedUser));
+    return updatedUser;
   };
 
   const logout = async () => {
@@ -131,6 +163,9 @@ export const AuthProvider = ({ children }) => {
         loading,
         login,
         register,
+        recoverAccount,
+        createRecoveryCode,
+        updateProfile,
         logout,
         autoStartGuest,
         updateStatsLocally,

@@ -24,8 +24,11 @@ api.interceptors.request.use(
 export const authApi = {
   register: (data) => api.post('/auth/register', data),
   login: (data) => api.post('/auth/login', data),
+  recoverAccount: (data) => api.post('/auth/recover', data),
+  createRecoveryCode: () => api.post('/auth/recovery-code'),
   guestLogin: () => api.post('/auth/guest'),
   getMe: () => api.get('/auth/me'),
+  updateProfile: (data) => api.put('/auth/profile', data),
 };
 
 export const matchApi = {

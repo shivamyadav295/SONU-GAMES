@@ -11,6 +11,8 @@ export const RoomLobby = ({
   onLeaveRoom,
   onSendReaction,
   activeReaction,
+  errorMessage: serverErrorMessage = '',
+  onClearError,
 }) => {
   const [tab, setTab] = useState('create'); // 'create' or 'join'
   const [inputCode, setInputCode] = useState('');
@@ -31,8 +33,10 @@ export const RoomLobby = ({
     if (!inputCode.trim()) return;
     soundManager.playSelect();
     setErrorMessage('');
+    onClearError?.();
     onJoinRoom(inputCode.trim().toUpperCase());
   };
+  const displayedErrorMessage = serverErrorMessage || errorMessage;
 
   const reactionEmojis = ['🔥', '🎯', '💥', '⚡', '🤖', '👏', '💀', '😱'];
 
@@ -163,6 +167,8 @@ export const RoomLobby = ({
           <button
             onClick={() => {
               soundManager.playSelect();
+              setErrorMessage('');
+              onClearError?.();
               setTab('create');
             }}
             className={`py-2 text-xs font-semibold rounded-lg transition-all ${
@@ -176,6 +182,8 @@ export const RoomLobby = ({
           <button
             onClick={() => {
               soundManager.playSelect();
+              setErrorMessage('');
+              onClearError?.();
               setTab('join');
             }}
             className={`py-2 text-xs font-semibold rounded-lg transition-all ${
@@ -223,6 +231,8 @@ export const RoomLobby = ({
             <button
               onClick={() => {
                 soundManager.playSelect();
+                setErrorMessage('');
+                onClearError?.();
                 const targetWins = Math.ceil(targetRounds / 2);
                 onCreateRoom(targetWins, targetRounds);
               }}
@@ -252,10 +262,10 @@ export const RoomLobby = ({
               />
             </div>
 
-            {errorMessage && (
+            {displayedErrorMessage && (
               <div className="p-2.5 rounded-lg bg-rose-950/60 border border-rose-800/60 text-rose-300 text-xs flex items-center space-x-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{errorMessage}</span>
+                <span>{displayedErrorMessage}</span>
               </div>
             )}
 

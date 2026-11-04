@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bot, Users, Sparkles, Flame } from 'lucide-react';
+import { Bot, Users } from 'lucide-react';
 import soundManager from '../services/sound';
 
 export const ModeSelector = ({
@@ -16,10 +16,10 @@ export const ModeSelector = ({
   ];
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 w-full p-3 rounded-2xl bg-[#0e1424] border border-[#1f2b48]">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 w-full p-3 rounded-2xl bg-white/90 border border-slate-200 shadow-sm">
       
       {/* Mode Buttons: PvC vs PvP */}
-      <div className="flex items-center p-1 bg-[#090d16] rounded-xl border border-[#1b253c] w-full sm:w-auto">
+      <div className="flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200 w-full sm:w-auto">
         <button
           type="button"
           disabled={disabled}
@@ -31,8 +31,8 @@ export const ModeSelector = ({
           }}
           className={`flex-1 sm:flex-initial flex items-center justify-center space-x-2 px-4 py-2 rounded-lg text-xs font-arcade font-bold tracking-wider transition-all duration-200 ${
             mode === 'pvc'
-              ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-black shadow-md shadow-cyan-500/25'
-              : 'text-slate-400 hover:text-white'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-800'
           }`}
         >
           <Bot className="w-4 h-4" />
@@ -50,8 +50,8 @@ export const ModeSelector = ({
           }}
           className={`flex-1 sm:flex-initial flex items-center justify-center space-x-2 px-4 py-2 rounded-lg text-xs font-arcade font-bold tracking-wider transition-all duration-200 ${
             mode === 'pvp'
-              ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-md shadow-pink-500/25'
-              : 'text-slate-400 hover:text-white'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-800'
           }`}
         >
           <Users className="w-4 h-4" />
@@ -76,8 +76,8 @@ export const ModeSelector = ({
               }}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
                 roundsCount === fmt.rounds
-                  ? 'bg-amber-950/60 border-amber-500 text-amber-300 shadow-sm shadow-amber-500/20'
-                  : 'bg-[#121829] border-[#1f2b48] text-slate-400 hover:text-white hover:border-slate-500'
+                  ? 'bg-amber-50 border-amber-300 text-amber-800'
+                  : 'bg-white border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-300'
               }`}
             >
               <span>{fmt.label}</span>

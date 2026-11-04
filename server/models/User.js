@@ -18,9 +18,22 @@ const userSchema = new mongoose.Schema(
       trim: true,
       lowercase: true,
     },
+    phone: {
+      type: String,
+      required: false,
+      unique: true,
+      sparse: true,
+      trim: true,
+    },
     password: {
       type: String,
       required: false,
+    },
+    recoveryCodeHash: {
+      type: String,
+      select: false,
+      unique: true,
+      sparse: true,
     },
     isGuest: {
       type: Boolean,
@@ -29,6 +42,12 @@ const userSchema = new mongoose.Schema(
     avatar: {
       type: String,
       default: 'robot', // robot, ninja, wizard, cyberpunk, skull
+    },
+    privacy: {
+      maskContact: {
+        type: Boolean,
+        default: true,
+      },
     },
     stats: {
       wins: { type: Number, default: 0 },
