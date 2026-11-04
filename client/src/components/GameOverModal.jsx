@@ -15,6 +15,7 @@ export const GameOverModal = ({
   onPlayAgain,
   onExitLobby,
   rematchWaiting = false,
+  rematchAvailable = true,
   rematchStatus = null, // { p1Ready: Boolean, p2Ready: Boolean }
   forfeitMessage = null, // alert message when player exits browser
 }) => {
@@ -160,17 +161,19 @@ export const GameOverModal = ({
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row items-center gap-3">
-          <button
-            onClick={() => {
-              soundManager.playSelect();
-              onPlayAgain();
-            }}
-            disabled={rematchWaiting}
-            className="w-full sm:flex-1 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-arcade font-bold text-xs tracking-wider shadow-lg shadow-cyan-500/25 transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
-          >
-            <RefreshCw className="w-4 h-4" />
-            <span>{mode === 'pvp' ? 'REQUEST REMATCH' : 'PLAY AGAIN'}</span>
-          </button>
+          {rematchAvailable && (
+            <button
+              onClick={() => {
+                soundManager.playSelect();
+                onPlayAgain();
+              }}
+              disabled={rematchWaiting}
+              className="w-full sm:flex-1 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-arcade font-bold text-xs tracking-wider shadow-lg shadow-cyan-500/25 transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>{mode === 'pvp' ? 'REQUEST REMATCH' : 'PLAY AGAIN'}</span>
+            </button>
+          )}
 
           <button
             onClick={() => {

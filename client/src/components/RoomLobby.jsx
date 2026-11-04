@@ -6,6 +6,7 @@ export const RoomLobby = ({
   room,
   isInRoom,
   isWaitingForOpponent,
+  socketConnected = false,
   onCreateRoom,
   onJoinRoom,
   onLeaveRoom,
@@ -19,24 +20,60 @@ export const RoomLobby = ({
   const [copied, setCopied] = useState(false);
   const [targetRounds, setTargetRounds] = useState(3);
   const [errorMessage, setErrorMessage] = useState('');
+  const [isRequesting, setIsRequesting] = useState(false);
 
-  const handleCopyCode = () => {
+  const handleCopyCode = async () => {
     if (!room?.roomCode) return;
     soundManager.playSelect();
-    navigator.clipboard.writeText(room.roomCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(room.roomCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setErrorMessage('Could not copy the room code. Select and copy it manually.');
+    }
   };
 
-  const handleJoin = (e) => {
+  const handleJoin = async (e) => {
     e.preventDefault();
-    if (!inputCode.trim()) return;
+    if (!/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/.test(inputCode)) {
+      setErrorMessage('Enter a valid 6-character room code.');
+      return;
+    }
     soundManager.playSelect();
     setErrorMessage('');
     onClearError?.();
-    onJoinRoom(inputCode.trim().toUpperCase());
+    setIsRequesting(true);
+    try {
+      const response = await onJoinRoom(inputCode);
+      if (!response?.ok) {
+        setIsRequesting(false);
+        setErrorMessage(response?.message || 'Could not join the room. Please try again.');
+      }
+    } catch {
+      setIsRequesting(false);
+      setErrorMessage('Could not join the room. Please try again.');
+    }
   };
   const displayedErrorMessage = serverErrorMessage || errorMessage;
+
+  const handleCreate = async () => {
+    soundManager.playSelect();
+    setErrorMessage('');
+    onClearError?.();
+    setIsRequesting(true);
+    try {
+      const targetWins = Math.ceil(targetRounds / 2);
+      const response = await onCreateRoom(targetWins, targetRounds);
+      if (!response?.ok) {
+        setIsRequesting(false);
+        setErrorMessage(response?.message || 'Could not create the room. Please try again.');
+      }
+    } catch {
+      setIsRequesting(false);
+      setErrorMessage('Could not create the room. Please try again.');
+    }
+  };
 
   const reactionEmojis = ['🔥', '🎯', '💥', '⚡', '🤖', '👏', '💀', '😱'];
 
@@ -212,11 +249,12 @@ export const RoomLobby = ({
                   <button
                     key={fmt.rounds}
                     type="button"
+                    disabled={isRequesting || !socketConnected}
                     onClick={() => {
                       soundManager.playSelect();
                       setTargetRounds(fmt.rounds);
                     }}
-                    className={`py-2 px-1 rounded-xl text-xs font-semibold border transition-all ${
+                    className={`py-2 px-1 rounded-xl text-xs font-semibold border transition-all disabled:opacity-50 ${
                       targetRounds === fmt.rounds
                         ? 'bg-cyan-950/70 border-cyan-400 text-cyan-300 shadow-sm shadow-cyan-500/20'
                         : 'bg-[#131a2d] border-[#233052] text-slate-400 hover:border-slate-500'
@@ -229,18 +267,24 @@ export const RoomLobby = ({
             </div>
 
             <button
-              onClick={() => {
-                soundManager.playSelect();
-                setErrorMessage('');
-                onClearError?.();
-                const targetWins = Math.ceil(targetRounds / 2);
-                onCreateRoom(targetWins, targetRounds);
-              }}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 via-sky-400 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-bold text-sm tracking-wider shadow-lg shadow-cyan-500/25 transition-all flex items-center justify-center space-x-2"
+              onClick={handleCreate}
+              disabled={!socketConnected || isRequesting}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 via-sky-400 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-bold text-sm tracking-wider shadow-lg shadow-cyan-500/25 transition-all flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <PlusCircle className="w-4 h-4" />
-              <span>Generate Room Code</span>
+              {isRequesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlusCircle className="w-4 h-4" />}
+              <span>{isRequesting ? 'Creating Room...' : 'Generate Room Code'}</span>
             </button>
+            {!socketConnected && (
+              <p role="status" className="text-center text-xs text-amber-600">
+                Connecting to the multiplayer server...
+              </p>
+            )}
+            {displayedErrorMessage && (
+              <div role="alert" className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{displayedErrorMessage}</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -255,8 +299,9 @@ export const RoomLobby = ({
                 type="text"
                 required
                 maxLength={6}
+                autoComplete="off"
                 value={inputCode}
-                onChange={(e) => setInputCode(e.target.value.toUpperCase())}
+                onChange={(e) => setInputCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
                 placeholder="e.g. 7K2M9X"
                 className="w-full px-4 py-3 rounded-xl bg-[#080b12] border border-[#233052] font-arcade text-center text-lg tracking-widest text-pink-400 placeholder-slate-600 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 uppercase transition-all"
               />
@@ -271,11 +316,17 @@ export const RoomLobby = ({
 
             <button
               type="submit"
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-pink-500 via-fuchsia-500 to-purple-600 hover:from-pink-400 hover:to-purple-500 text-white font-bold text-sm tracking-wider shadow-lg shadow-pink-500/25 transition-all flex items-center justify-center space-x-2"
+              disabled={!socketConnected || isRequesting}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-pink-500 via-fuchsia-500 to-purple-600 hover:from-pink-400 hover:to-purple-500 text-white font-bold text-sm tracking-wider shadow-lg shadow-pink-500/25 transition-all flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <span>Connect to Arena</span>
-              <ArrowRight className="w-4 h-4" />
+              {isRequesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+              <span>{isRequesting ? 'Joining Room...' : 'Connect to Arena'}</span>
             </button>
+            {!socketConnected && (
+              <p role="status" className="text-center text-xs text-amber-600">
+                Connecting to the multiplayer server...
+              </p>
+            )}
           </form>
         )}
 

@@ -85,8 +85,17 @@ export function App() {
   const [pvpRematchWaiting, setPvpRematchWaiting] = useState(false);
   const [floatingReaction, setFloatingReaction] = useState(null);
   const [forfeitMessage, setForfeitMessage] = useState(null);
+  const [socketConnected, setSocketConnected] = useState(false);
 
   const pvcTimerRef = useRef(null);
+  const roomRef = useRef(room);
+  const userRef = useRef(user);
+  const updateStatsRef = useRef(updateStatsLocally);
+  const refreshProfileRef = useRef(refreshProfile);
+  roomRef.current = room;
+  userRef.current = user;
+  updateStatsRef.current = updateStatsLocally;
+  refreshProfileRef.current = refreshProfile;
 
   // Handle browser tab/window exit - stops active games immediately
   useEffect(() => {
@@ -359,8 +368,33 @@ export function App() {
   // ----------------------------------------------------
   useEffect(() => {
     const socket = getSocket();
+    setSocketConnected(socket.connected);
 
-    socket.on('room_created', ({ roomCode, room: newRoom }) => {
+    const handleConnect = () => {
+      setSocketConnected(true);
+      setRoomError('');
+    };
+
+    const handleDisconnect = () => {
+      setSocketConnected(false);
+      if (roomRef.current) {
+        setRoom(null);
+        setIsInRoom(false);
+        setIsWaitingForOpponent(false);
+        setRoomError('Connection lost. The room was closed; reconnect and create or join another room.');
+      }
+    };
+
+    const handleConnectError = () => {
+      setSocketConnected(false);
+      setRoomError('Unable to connect to the multiplayer server. Retrying...');
+    };
+
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+    socket.on('connect_error', handleConnectError);
+
+    socket.on('room_created', ({ room: newRoom }) => {
       setRoom(newRoom);
       setIsInRoom(true);
       setIsWaitingForOpponent(true);
@@ -409,9 +443,10 @@ export function App() {
     });
 
     socket.on('player_locked_in', ({ playerId }) => {
-      const socketId = socket.id;
-      const isMe = (room?.player1?.socketId === socketId && room?.player1?.id === playerId) ||
-                   (room?.player2?.socketId === socketId && room?.player2?.id === playerId);
+      const currentRoom = roomRef.current;
+      const currentUser = userRef.current;
+      const myId = currentUser?._id || currentUser?.id;
+      const isMe = playerId === myId;
       if (isMe) {
         setPvpMyLocked(true);
       } else {
@@ -427,7 +462,9 @@ export function App() {
         setPvpIsClashing(false);
         setPvpScores(scores);
 
-        const amIPlayer1 = room?.player1?.id === (user?._id || user?.id);
+        const currentRoom = roomRef.current;
+        const currentUser = userRef.current;
+        const amIPlayer1 = currentRoom?.player1?.id === (currentUser?._id || currentUser?.id);
         const myMove = amIPlayer1 ? roundSummary.p1Move : roundSummary.p2Move;
         const oppMove = amIPlayer1 ? roundSummary.p2Move : roundSummary.p1Move;
 
@@ -456,9 +493,10 @@ export function App() {
       setPvpScores(scores);
       setPvpRoundsHistory(roundsHistory);
 
-      const isMyWin = winner?.id === (user?._id || user?.id);
-      updateStatsLocally(isMyWin ? 'win' : 'loss');
-      refreshProfile();
+      const currentUser = userRef.current;
+      const isMyWin = winner?.id === (currentUser?._id || currentUser?.id);
+      updateStatsRef.current(isMyWin ? 'win' : 'loss');
+      refreshProfileRef.current();
 
       setTimeout(() => {
         setShowGameOver(true);
@@ -473,11 +511,13 @@ export function App() {
     });
 
     socket.on('opponent_left', ({ message }) => {
-      setForfeitMessage(message || 'The other player closed their browser. Game stopped.');
-      setShowGameOver(true);
+      const notice = message || 'The other player closed their browser. Game stopped.';
+      setForfeitMessage(notice);
+      setRoomError(notice);
       setRoom(null);
       setIsInRoom(false);
       setIsWaitingForOpponent(false);
+      setShowGameOver(false);
     });
 
     socket.on('reaction_received', ({ emoji }) => {
@@ -499,6 +539,9 @@ export function App() {
     });
 
     return () => {
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+      socket.off('connect_error', handleConnectError);
       socket.off('room_created');
       socket.off('error_message');
       socket.off('room_ready');
@@ -508,16 +551,32 @@ export function App() {
       socket.off('round_result');
       socket.off('game_over');
       socket.off('player_forfeited');
+      socket.off('opponent_left');
       socket.off('reaction_received');
       socket.off('rematch_started');
     };
-  }, [room, user]);
+  }, []);
 
   // PvP Actions
+  const sendRoomRequest = (eventName, payload) => new Promise((resolve) => {
+    const socket = getSocket();
+    if (!socket.connected) {
+      resolve({ ok: false, message: 'Not connected to the multiplayer server. Please try again.' });
+      return;
+    }
+
+    socket.timeout(8000).emit(eventName, payload, (error, response) => {
+      if (error) {
+        resolve({ ok: false, message: 'The server did not respond. Please try again.' });
+      } else {
+        resolve(response || { ok: false, message: 'The server returned an invalid response.' });
+      }
+    });
+  });
+
   const handleCreateRoom = (targetW, count) => {
     setRoomError('');
-    const socket = getSocket();
-    socket.emit('create_room', {
+    return sendRoomRequest('create_room', {
       user: {
         id: user?._id || user?.id,
         username: user?.username,
@@ -531,8 +590,7 @@ export function App() {
 
   const handleJoinRoom = (code) => {
     setRoomError('');
-    const socket = getSocket();
-    socket.emit('join_room', {
+    return sendRoomRequest('join_room', {
       roomCode: code,
       user: {
         id: user?._id || user?.id,
@@ -692,6 +750,7 @@ export function App() {
             room={room}
             isInRoom={isInRoom}
             isWaitingForOpponent={isWaitingForOpponent}
+            socketConnected={socketConnected}
             onCreateRoom={handleCreateRoom}
             onJoinRoom={handleJoinRoom}
             onLeaveRoom={handleLeaveRoom}
@@ -936,6 +995,7 @@ export function App() {
           if (!isPvc) handleLeaveRoom();
         }}
         rematchWaiting={pvpRematchWaiting}
+        rematchAvailable={isPvc || Boolean(room && !forfeitMessage)}
         forfeitMessage={forfeitMessage}
       />
 

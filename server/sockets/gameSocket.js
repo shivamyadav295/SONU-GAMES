@@ -1,4 +1,5 @@
 const storage = require('../services/storage');
+const crypto = require('crypto');
 
 // Helper to determine winner between two moves
 function determineRoundWinner(p1Move, p2Move) {
@@ -21,12 +22,18 @@ function generateRoomCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
   for (let i = 0; i < 6; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+    code += chars.charAt(crypto.randomInt(chars.length));
   }
   return code;
 }
 
 const rooms = new Map();
+const validMoves = new Set(['rock', 'paper', 'scissors']);
+
+function acknowledgeRoomRequest(socket, acknowledge, response) {
+  if (typeof acknowledge === 'function') acknowledge(response);
+  if (!response.ok) socket.emit('error_message', { message: response.message });
+}
 
 function setupGameSocket(io) {
   io.on('connection', (socket) => {
@@ -34,7 +41,30 @@ function setupGameSocket(io) {
     let currentRoomCode = null;
 
     // 1. Create Room
-    socket.on('create_room', ({ user, targetWins = 2, roundsCount = 3 }) => {
+    socket.on('create_room', (payload = {}, acknowledge) => {
+      if (currentRoomCode && !rooms.has(currentRoomCode)) {
+        socket.leave(currentRoomCode);
+        currentRoomCode = null;
+      }
+      if (currentRoomCode && rooms.has(currentRoomCode)) {
+        return acknowledgeRoomRequest(socket, acknowledge, {
+          ok: false,
+          message: 'Leave your current room before creating another one.',
+        });
+      }
+
+      const request = payload && typeof payload === 'object' ? payload : {};
+      const { user, targetWins = 2, roundsCount = 3 } = request;
+      const validFormats = new Map([[1, 1], [3, 2], [5, 3]]);
+      const rounds = Number(roundsCount);
+      const wins = Number(targetWins);
+      if (!validFormats.has(rounds) || validFormats.get(rounds) !== wins) {
+        return acknowledgeRoomRequest(socket, acknowledge, {
+          ok: false,
+          message: 'Choose a valid match length and try again.',
+        });
+      }
+
       let roomCode = generateRoomCode();
       while (rooms.has(roomCode)) {
         roomCode = generateRoomCode();
@@ -53,8 +83,8 @@ function setupGameSocket(io) {
 
       const roomData = {
         roomCode,
-        targetWins: Number(targetWins) || 2, // Best of 3 => 2 wins
-        roundsCount: Number(roundsCount) || 3,
+        targetWins: wins,
+        roundsCount: rounds,
         status: 'waiting', // waiting, countdown, playing, round_result, game_over
         player1,
         player2: null,
@@ -72,25 +102,55 @@ function setupGameSocket(io) {
         roomCode,
         room: sanitizeRoomForClient(roomData),
       });
+      acknowledgeRoomRequest(socket, acknowledge, { ok: true, roomCode });
 
       console.log(`[Socket] Room created: ${roomCode} by ${player1.username}`);
     });
 
     // 2. Join Room
-    socket.on('join_room', ({ roomCode, user }) => {
-      const code = (roomCode || '').toUpperCase().trim();
+    socket.on('join_room', (payload = {}, acknowledge) => {
+      if (currentRoomCode && !rooms.has(currentRoomCode)) {
+        socket.leave(currentRoomCode);
+        currentRoomCode = null;
+      }
+      const request = payload && typeof payload === 'object' ? payload : {};
+      const { roomCode, user } = request;
+      const code = typeof roomCode === 'string' ? roomCode.toUpperCase().trim() : '';
+      if (!/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/.test(code)) {
+        return acknowledgeRoomRequest(socket, acknowledge, {
+          ok: false,
+          message: 'Enter a valid 6-character room code.',
+        });
+      }
+
+      if (currentRoomCode && rooms.has(currentRoomCode)) {
+        return acknowledgeRoomRequest(socket, acknowledge, {
+          ok: false,
+          message: 'Leave your current room before joining another one.',
+        });
+      }
+
       const room = rooms.get(code);
 
       if (!room) {
-        return socket.emit('error_message', { message: 'Room not found. Check the code.' });
+        return acknowledgeRoomRequest(socket, acknowledge, {
+          ok: false,
+          message: 'Room not found. Check the code.',
+        });
       }
 
       if (room.player2) {
-        return socket.emit('error_message', { message: 'Room is already full.' });
+        return acknowledgeRoomRequest(socket, acknowledge, {
+          ok: false,
+          message: 'Room is already full.',
+        });
       }
 
       if (room.player1.socketId === socket.id) {
-        return socket.emit('error_message', { message: 'You are already in this room.' });
+        return acknowledgeRoomRequest(socket, acknowledge, {
+          ok: false,
+          message: 'You are already in this room.',
+        });
       }
 
       const player2 = {
@@ -115,26 +175,42 @@ function setupGameSocket(io) {
       io.to(code).emit('room_ready', {
         room: sanitizeRoomForClient(room),
       });
+      acknowledgeRoomRequest(socket, acknowledge, { ok: true, roomCode: code });
 
       // Start round 1 timer
       startRoundCountdown(io, room);
     });
 
     // 3. Submit Move
-    socket.on('submit_move', ({ roomCode, move }) => {
+    socket.on('submit_move', (payload = {}, acknowledge) => {
+      const { roomCode, move } = payload;
       const room = rooms.get(roomCode);
-      if (!room || room.status !== 'playing') return;
+      if (!room || room.status !== 'playing') {
+        if (typeof acknowledge === 'function') acknowledge({ ok: false, message: 'This room is not accepting moves.' });
+        return;
+      }
+
+      if (!validMoves.has(move)) {
+        if (typeof acknowledge === 'function') acknowledge({ ok: false, message: 'Choose rock, paper, or scissors.' });
+        return;
+      }
 
       const isP1 = room.player1.socketId === socket.id;
       const isP2 = room.player2 && room.player2.socketId === socket.id;
 
-      if (!isP1 && !isP2) return;
-
-      if (isP1) {
-        room.player1.currentMove = move;
-      } else {
-        room.player2.currentMove = move;
+      if (!isP1 && !isP2) {
+        if (typeof acknowledge === 'function') acknowledge({ ok: false, message: 'You are not a player in this room.' });
+        return;
       }
+
+      const player = isP1 ? room.player1 : room.player2;
+      if (player.currentMove) {
+        if (typeof acknowledge === 'function') acknowledge({ ok: false, message: 'Your move is already locked in.' });
+        return;
+      }
+
+      player.currentMove = move;
+      if (typeof acknowledge === 'function') acknowledge({ ok: true });
 
       // Notify other player that move has been locked in (without revealing which move!)
       io.to(roomCode).emit('player_locked_in', {
@@ -149,9 +225,10 @@ function setupGameSocket(io) {
     });
 
     // 4. Send reaction emoji
-    socket.on('send_reaction', ({ roomCode, emoji }) => {
+    socket.on('send_reaction', ({ roomCode, emoji } = {}) => {
       const room = rooms.get(roomCode);
-      if (!room) return;
+      if (!room || ![room.player1.socketId, room.player2?.socketId].includes(socket.id)) return;
+      if (typeof emoji !== 'string' || emoji.length > 8) return;
       io.to(roomCode).emit('reaction_received', {
         senderSocketId: socket.id,
         emoji,
@@ -159,12 +236,13 @@ function setupGameSocket(io) {
     });
 
     // 5. Request Rematch
-    socket.on('request_rematch', ({ roomCode }) => {
+    socket.on('request_rematch', ({ roomCode } = {}) => {
       const room = rooms.get(roomCode);
-      if (!room) return;
+      if (!room || room.status !== 'game_over') return;
 
       const isP1 = room.player1.socketId === socket.id;
       const isP2 = room.player2 && room.player2.socketId === socket.id;
+      if (!isP1 && !isP2) return;
 
       if (isP1) room.player1.rematchReady = true;
       if (isP2) room.player2.rematchReady = true;
@@ -201,12 +279,22 @@ function setupGameSocket(io) {
       if (currentRoomCode && rooms.has(currentRoomCode)) {
         handlePlayerExit(io, currentRoomCode, socket.id);
       }
+      currentRoomCode = null;
     });
 
-    socket.on('leave_room', ({ roomCode }) => {
-      if (roomCode && rooms.has(roomCode)) {
-        handlePlayerExit(io, roomCode, socket.id);
+    socket.on('leave_room', ({ roomCode } = {}, acknowledge) => {
+      const code = typeof roomCode === 'string' ? roomCode.toUpperCase().trim() : '';
+      if (!code || code !== currentRoomCode || !rooms.has(code)) {
+        return acknowledgeRoomRequest(socket, acknowledge, {
+          ok: false,
+          message: 'You are no longer in that room.',
+        });
       }
+
+      currentRoomCode = null;
+      socket.leave(code);
+      handlePlayerExit(io, code, socket.id);
+      if (typeof acknowledge === 'function') acknowledge({ ok: true });
     });
   });
 }
@@ -223,6 +311,7 @@ function handlePlayerExit(io, roomCode, socketId) {
 
   const isP1 = room.player1.socketId === socketId;
   const isP2 = room.player2 && room.player2.socketId === socketId;
+  if (!isP1 && !isP2) return;
 
   if (room.status === 'playing' || room.status === 'round_result') {
     // Forfeit win for remaining player because opponent closed browser or left
@@ -257,6 +346,7 @@ function handlePlayerExit(io, roomCode, socketId) {
   }
 
   // Delete room completely from memory
+  io.in(roomCode).socketsLeave(roomCode);
   rooms.delete(roomCode);
   console.log(`[Socket] Room ${roomCode} closed and removed due to player disconnect/browser exit.`);
 }
